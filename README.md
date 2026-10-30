@@ -57,12 +57,12 @@ Run Jupyter from the repo root after `pip install -e .`, and set `DATA_DIR` in t
 ## Quick start
 
 ```python
-from hgfraud.data import load_train
+from hgfraud.data import load_train, add_entity_keys
 from hgfraud.graph import build_graph
 from hgfraud.features import graph_features
 from hgfraud.model import time_split, compare
 
-df = load_train("data/raw")
+df = add_entity_keys(load_train("data/raw"))
 train, test = time_split(df)
 G = build_graph(train)                        # graph from training period only
 feats = graph_features(df, G, train_index=train.index)
