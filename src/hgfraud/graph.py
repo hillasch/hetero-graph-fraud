@@ -16,40 +16,27 @@ def entity_node(etype: str, value) -> str:
     return f"{etype}:{value}"
 
 
-def edge_list(df: pd.DataFrame, entity_types: dict[str, str] = ENTITY_TYPES) -> pd.DataFrame:
-    """Long table of (tx node, entity node, entity type) — one row per edge."""
-    frames = []
-    tx_nodes = "tx:" + df.index.astype(str)
-    for col, etype in entity_types.items():
-        if col not in df.columns:
-            continue
-        mask = df[col].notna().to_numpy()
-        frames.append(pd.DataFrame({
-            "tx": tx_nodes[mask],
-            "entity": etype + ":" + df.loc[mask, col].astype(str).to_numpy(),
-            "etype": etype,
-        }))
-    return pd.concat(frames, ignore_index=True)
-
-
 def build_graph(df: pd.DataFrame, entity_types: dict[str, str] = ENTITY_TYPES) -> nx.Graph:
     """Bipartite-style heterogeneous graph.
 
     Transaction nodes are ``tx:<id>`` with attribute ``is_fraud``.
-    Entity nodes are ``<type>:<value>`` with attribute ``ntype``. Each
-    transaction gets an edge to every non-missing entity it uses.
-    Expects keys from ``data.add_entity_keys``.
+    Entity nodes are ``<type>:<value>``. Each transaction gets an edge to
+    every non-missing entity it uses. Expects keys from ``data.add_entity_keys``.
     """
     G = nx.Graph()
-    labels = df["isFraud"] if "isFraud" in df.columns else pd.Series(None, index=df.index)
-    G.add_nodes_from(
-        (f"tx:{i}", {"ntype": "transaction", "is_fraud": None if pd.isna(y) else int(y)})
-        for i, y in labels.items()
-    )
-    edges = edge_list(df, entity_types)
-    G.add_nodes_from((e, {"ntype": t}) for e, t in
-                     edges.drop_duplicates("entity")[["entity", "etype"]].itertuples(index=False))
-    G.add_edges_from((a, b, {"etype": t}) for a, b, t in edges.itertuples(index=False))
+    has_label = "isFraud" in df.columns
+
+    for tx_id, row in df.iterrows():
+        tx = f"tx:{tx_id}"
+        G.add_node(tx, ntype="transaction",
+                   is_fraud=int(row["isFraud"]) if has_label else None)
+        for col, etype in entity_types.items():
+            val = row.get(col)
+            if pd.notna(val):
+                ent = entity_node(etype, val)
+                if ent not in G:
+                    G.add_node(ent, ntype=etype)
+                G.add_edge(tx, ent, etype=etype)
     return G
 
 

@@ -4,64 +4,37 @@ from pathlib import Path
 
 import pandas as pd
 
-# Columns needed to build entity keys (graph nodes).
-ENTITY_SOURCE_COLS = {
-    "card_key": ["card1", "card2", "card3", "card5", "addr1"],
-    "device_key": ["DeviceType", "DeviceInfo", "id_30", "id_31", "id_33"],
-    "addr_key": ["addr1", "addr2"],
-    "p_email": ["P_emaildomain"],
-    "r_email": ["R_emaildomain"],
-}
-BASE_COLS = ["TransactionID", "TransactionDT", "TransactionAmt", "ProductCD", "isFraud"]
 
-
-def load_train(raw_dir: str | Path = "data/raw", nrows: int | None = None,
-               usecols: list[str] | None = None) -> pd.DataFrame:
-    """Return train_transaction left-joined with train_identity, indexed by TransactionID.
-
-    ``usecols`` limits loaded columns (identity columns are filtered too), which
-    keeps memory low for exploration. ``nrows`` reads only the first N transactions.
-    """
+def load_train(raw_dir: str | Path = "data/raw", nrows: int | None = None) -> pd.DataFrame:
+    """Return train_transaction left-joined with train_identity, indexed by TransactionID."""
     raw_dir = Path(raw_dir)
-    wanted = None if usecols is None else set(usecols) | {"TransactionID"}
-
-    tx = pd.read_csv(raw_dir / "train_transaction.csv", nrows=nrows,
-                     usecols=(lambda c: c in wanted) if wanted else None)
+    tx = pd.read_csv(raw_dir / "train_transaction.csv", nrows=nrows)
     ident = pd.read_csv(raw_dir / "train_identity.csv")
-    # test_identity uses "id-01" style names; normalise to "id_01".
+    # Kaggle's test_identity uses "id-01" style names; normalise to "id_01".
     ident.columns = [c.replace("-", "_") for c in ident.columns]
-    if wanted:
-        ident = ident[[c for c in ident.columns if c in wanted]]
-
     df = tx.merge(ident, on="TransactionID", how="left")
     return df.set_index("TransactionID").sort_values("TransactionDT")
-
-
-def entity_columns() -> list[str]:
-    """All raw columns needed for ``add_entity_keys`` plus the basics."""
-    cols = list(BASE_COLS)
-    for src in ENTITY_SOURCE_COLS.values():
-        cols += [c for c in src if c not in cols]
-    return cols
 
 
 def add_entity_keys(df: pd.DataFrame) -> pd.DataFrame:
     """Add composite entity keys used as graph nodes.
 
-    card1 alone is not a unique card, so card fields are combined with the
-    billing address to approximate a real card identity. The device
-    fingerprint combines device info with OS / browser / screen fields.
-    A key is missing (NA) when all its source fields are missing.
+    card1 alone is not a unique card, so we combine card fields with the
+    billing address to approximate a real card identity. Device fingerprint
+    combines device info with browser / OS / screen identity fields.
     """
     out = df.copy()
-    for key, cols in ENTITY_SOURCE_COLS.items():
+
+    def combo(cols):
         present = [c for c in cols if c in out.columns]
-        if not present:
-            out[key] = pd.NA
-            continue
         parts = out[present].astype("string")
-        joined = parts.iloc[:, 0].fillna("NA")
-        for c in present[1:]:
-            joined = joined + "|" + parts[c].fillna("NA")
-        out[key] = joined.where(parts.notna().any(axis=1))
+        key = parts.fillna("NA").agg("|".join, axis=1)
+        # A key that is entirely missing is not a real shared entity.
+        return key.where(parts.notna().any(axis=1))
+
+    out["card_key"] = combo(["card1", "card2", "card3", "card5", "addr1"])
+    out["device_key"] = combo(["DeviceType", "DeviceInfo", "id_30", "id_31", "id_33"])
+    out["addr_key"] = combo(["addr1", "addr2"])
+    out["p_email"] = out.get("P_emaildomain")
+    out["r_email"] = out.get("R_emaildomain")
     return out

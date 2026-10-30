@@ -46,23 +46,15 @@ unzip data/raw/ieee-fraud-detection.zip -d data/raw
 
 You need `train_transaction.csv` and `train_identity.csv` in `data/raw/`.
 
-## Notebooks
-
-| Notebook | What it answers |
-|---|---|
-| `01_eda_entity_sharing.ipynb` | How often are cards / devices / addresses / emails shared, does fraud concentrate in shared entities, and does guilt-by-association predict future fraud? |
-
-Run Jupyter from the repo root after `pip install -e .`, and set `DATA_DIR` in the first cell if your CSVs aren't in `data/raw/`.
-
 ## Quick start
 
 ```python
-from hgfraud.data import load_train, add_entity_keys
+from hgfraud.data import load_train
 from hgfraud.graph import build_graph
 from hgfraud.features import graph_features
 from hgfraud.model import time_split, compare
 
-df = add_entity_keys(load_train("data/raw"))
+df = load_train("data/raw")
 train, test = time_split(df)
 G = build_graph(train)                        # graph from training period only
 feats = graph_features(df, G, train_index=train.index)
@@ -72,9 +64,9 @@ print(results)
 
 ## Status
 
-- [x] EDA notebook on entity sharing (written — run on full data and fill in takeaways)
-- [x] Graph construction
-- [x] Graph feature extraction (degree, leave-one-out fraud rate, component size)
+- [ ] EDA on entity sharing (how often do cards/devices repeat?)
+- [ ] Graph construction
+- [ ] Graph feature extraction
 - [ ] Baseline XGBoost
 - [ ] Graph-enhanced XGBoost
 - [ ] Results & write-up
