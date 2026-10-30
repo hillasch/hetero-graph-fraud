@@ -46,6 +46,14 @@ unzip data/raw/ieee-fraud-detection.zip -d data/raw
 
 You need `train_transaction.csv` and `train_identity.csv` in `data/raw/`.
 
+## Notebooks
+
+| Notebook | What it answers |
+|---|---|
+| `01_eda_entity_sharing.ipynb` | How often are cards / devices / addresses / emails shared, does fraud concentrate in shared entities, and does guilt-by-association predict future fraud? |
+
+Run Jupyter from the repo root after `pip install -e .`, and set `DATA_DIR` in the first cell if your CSVs aren't in `data/raw/`.
+
 ## Quick start
 
 ```python
@@ -64,9 +72,9 @@ print(results)
 
 ## Status
 
-- [ ] EDA on entity sharing (how often do cards/devices repeat?)
-- [ ] Graph construction
-- [ ] Graph feature extraction
+- [x] EDA notebook on entity sharing (written — run on full data and fill in takeaways)
+- [x] Graph construction
+- [x] Graph feature extraction (degree, leave-one-out fraud rate, component size)
 - [ ] Baseline XGBoost
 - [ ] Graph-enhanced XGBoost
 - [ ] Results & write-up
